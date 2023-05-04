@@ -1,0 +1,1 @@
+chrome_executable_path = 'C:\Program Files\Google\Chrome\Application\chrome.exe'
