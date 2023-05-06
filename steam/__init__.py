@@ -1,20 +1,23 @@
+import asyncio
 import logging
+import time
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
+from datetime import datetime
+from typing import AsyncIterator, Optional
 
 from playwright.async_api import Page, TimeoutError
 
 from browser import Chrome
-from steam.errors import AlreadyAuthorizedError, SteamGuardCodeError, SteamGuardCodeFormatError, MailRuLoginError
-from steam.utils import get_user_id64_by_url
-from datetime import datetime
-
+from steam.errors import *
+from steam.utils import get_user_by_url
 from utils import convert_russian_datetime
 
 
 class AuthContext:
-    def __init__(self, auth_page: Page):
+    def __init__(self, auth_page: Page, steam_guard_required: bool = False):
         self.auth_page = auth_page
+        self.steam_guard_required = steam_guard_required
+        self.code_requested_ts: Optional[float] = None
 
     async def enter_auth_steam_guard_code(self, code: str):
         """
@@ -67,7 +70,7 @@ class Steam(Chrome):
         """
         page = await self.context.new_page()
         await page.goto('https://steamcommunity.com/login/home/', wait_until='networkidle')
-
+        auth_context = AuthContext(page)
         try:
             # Проверяем, есть ли активная авторизация.
             if 'login/home' not in page.url:
@@ -88,17 +91,27 @@ class Steam(Chrome):
                 await remember_me_checkbox.click()
 
             # нажимаем на кнопку "Войти".
+            auth_context.code_requested_ts = time.time()
             await page.click('//button[@class="newlogindialog_SubmitButton_2QgFE"]')
+            await page.wait_for_load_state('networkidle')
 
-            # Ждем появления поля для ввода кода Steam Guard.
-            await page.wait_for_selector('//div[@class="newlogindialog_SegmentedCharacterInput_1kJ6q"]', timeout=10000)
-            yield AuthContext(page)
+            # Если аккаунт сразу авторизовало, не потребовав ввести код Steam Guard.
+            if 'login' not in page.url:
+                if username := await self.get_self():
+                    logging.info(f'Авторизация Steam ({username}) прошла успешно. Код Steam Guard не требуется.')
+                    auth_context.steam_guard_required = False
+            else:
+                # Ждем появления поля для ввода кода Steam Guard.
+                await page.wait_for_selector('//div[@class="newlogindialog_SegmentedCharacterInput_1kJ6q"]',
+                                             timeout=10000)
+                auth_context.steam_guard_required = True
+            yield AuthContext(page, steam_guard_required=True)
         except TimeoutError:
             logging.info('TimeoutError - не появилась поле ввода кода Steam Guard')
         finally:
             await page.close()
 
-    async def get_steam_guard_code_from_mailru(self, login: str, password: str):
+    async def get_steam_guard_code_from_mailru(self, login: str, password: str, code_requested_ts: float):
         """
         Получает код Steam Guard из аккаунта электронной почты mail.ru.
 
@@ -131,13 +144,16 @@ class Steam(Chrome):
             await page.wait_for_load_state('networkidle', timeout=2000)
 
             await page.wait_for_selector('//td[@class="messageline__date messageline__item"]')
-            mail_rows = await page.query_selector_all('//tr[@class="messageline messageline_unread"]')
-            for mail_row in mail_rows:
-                datetime_string = await (
-                    await mail_row.query_selector('//td[@class="messageline__date messageline__item"]')).get_attribute(
-                    'title')
-                print(datetime.now())
-                print(convert_russian_datetime(datetime_string))
+            while True:
+                mail_rows = await page.query_selector_all('//tr[@class="messageline messageline_unread"]')
+                for mail_row in mail_rows:
+                    datetime_string = await (
+                        await mail_row.query_selector(
+                            '//td[@class="messageline__date messageline__item"]')).get_attribute(
+                        'title')
+                    print(datetime.now())
+                    print(convert_russian_datetime(datetime_string))
+                await asyncio.sleep(10)
 
     async def get_self(self) -> str | None:
         """
@@ -166,3 +182,29 @@ class Steam(Chrome):
                 return await page.text_content('//span[@class="persona online"]')
         finally:
             await page.close()
+
+    async def buy_game(self, game_url: str):
+        page = await self.context.new_page()
+        await page.goto(game_url, wait_until='networkidle')
+        await page.click('//a[@id="btn_add_to_cart_65766"]')
+        await page.wait_for_url('**/cart/', wait_until='networkidle')
+        await page.click('//a[@id="btn_purchase_self"]')
+        logging.info('Ждем')
+        await asyncio.sleep(10000)
+
+    async def send_friend_invite(self, user_url: str):
+        user = await get_user_by_url(user_url)
+
+        if not user.public:
+            raise UserProfileNotPublicError
+
+        page = await self.context.new_page()
+        await page.goto(user_url, wait_until='networkidle')
+        async with page.expect_response('**/AddFriendAjax') as response_info:
+            await page.click('//a[@id="btn_add_friend"]')
+        response = await response_info.value
+        json = await response.json()
+        if response.status == 400:
+            if json.get('failed_invites'):
+                if user.id64 in json['failed_invites']:
+                    raise UserFriendInviteFailed(await page.text_content('//div[@class="newmodal_content"]'))

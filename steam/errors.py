@@ -18,3 +18,9 @@ class SteamGuardCodeFormatError(Exception):
 
 class MailRuLoginError(Exception):
     ...
+
+class UserProfileNotPublicError(Exception):
+    ...
+
+class UserFriendInviteFailed(Exception):
+    ...

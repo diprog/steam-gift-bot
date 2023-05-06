@@ -10,7 +10,7 @@ class XMLUserInfo:
         self.public = public
 
 
-async def get_user_id64_by_url(profile_url: str) -> XMLUserInfo:
+async def get_user_by_url(profile_url: str) -> XMLUserInfo:
     async with aiohttp.ClientSession() as session:
         async with session.get(profile_url + '?xml=1') as r:
             xml_tree = etree.fromstring(await r.read())
