@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import ssl
 import traceback
 from pathlib import Path
 
@@ -161,7 +162,10 @@ def main():
     ])
     app.on_startup.append(on_startup)
     app.on_cleanup.append(on_cleanup)
-    web.run_app(app, port=80)
+    ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+    ssl_context.load_cert_chain('/etc/letsencrypt/live/aokistore.ru/fullchain.pem',
+                                '/etc/letsencrypt/live/aokistore.ru/privkey.pem')
+    web.run_app(app, host='0.0.0.0', port=443, ssl_context=ssl_context)
 
 
 if __name__ == '__main__':
