@@ -27,6 +27,10 @@ gift_semaphore = asyncio.Semaphore(1)
 async def delivery_page(request: web.Request):
     return web.Response(text=open('html/delivery.html', 'r', encoding='utf-8').read(), content_type='text/html')
 
+@routes.get('/')
+async def index_page(request: web.Request):
+    return web.Response(text=open('html/index.html', 'r', encoding='utf-8').read(), content_type='text/html')
+
 
 @routes.get('/delivery_redirect')
 async def delivery_page(request: web.Request):
@@ -157,15 +161,19 @@ def main():
     app.add_routes([
         web.static('/js', Path(__file__).parent.resolve() / 'html/js'),
         web.static('/css', Path(__file__).parent.resolve() / 'html/css'),
+        web.static('/assets', Path(__file__).parent.resolve() / 'html/assets'),
         web.static('/bootstrap/js', Path(__file__).parent.resolve() / 'html/bootstrap/js'),
         web.static('/bootstrap/css', Path(__file__).parent.resolve() / 'html/bootstrap/css')
     ])
     app.on_startup.append(on_startup)
     app.on_cleanup.append(on_cleanup)
-    ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-    ssl_context.load_cert_chain('/etc/letsencrypt/live/aokistore.ru/fullchain.pem',
-                                '/etc/letsencrypt/live/aokistore.ru/privkey.pem')
-    web.run_app(app, host='0.0.0.0', port=443, ssl_context=ssl_context)
+    try:
+        ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+        ssl_context.load_cert_chain('/etc/letsencrypt/live/aokistore.ru/fullchain.pem',
+                                    '/etc/letsencrypt/live/aokistore.ru/privkey.pem')
+        web.run_app(app, host='0.0.0.0', port=443, ssl_context=ssl_context)
+    except:
+        web.run_app(app, host='0.0.0.0', port=80)
 
 
 if __name__ == '__main__':

@@ -1,4 +1,5 @@
 import logging
+import sys
 
 from pyvirtualdisplay import Display
 
@@ -7,7 +8,7 @@ display = None
 
 def start_display():
     global display
-    if not display:
+    if not display and sys.platform == "linux":
         logging.info('Дисплей - Запуск...')
         display = Display(visible=False, size=(1920, 1080))
         display.start()
