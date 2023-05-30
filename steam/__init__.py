@@ -284,7 +284,7 @@ class Steam(Chrome):
             # Принимаем условия лицензионного соглашения
             await page.click('#accept_ssa')
             # Совершаем покупку игры
-            # await page.click('//a[@id="purchase_button_bottom"]')
+            await page.click('#purchase_button_bottom')
         finally:
             await page.close()
 
