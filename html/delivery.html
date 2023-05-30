@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="ru" data-bs-theme="dark">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Bootstrap demo</title>
+    <link href="bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <link href="css/bootstrap.css" rel="stylesheet">
+</head>
+<body class="d-grid flex-column align-items-center justify-content-center min-vh-100">
+<div class="d-grid justify-content-center" id="spinner">
+    <div class="spinner-border text-primary" role="status"></div>
+</div>
+<div class="d-none m-5" id="main_view">
+    <div class="d-grid gap-5 border rounded p-4 bg-body-tertiary shadow" >
+        <div class="row border rounded bg-body p-3 gap-3">
+            <div class="col-2 d-grid">
+                <div class="d-flex flex-column justify-content-center h-100">
+                    <div class="row">
+                        <img src="https://avatars.akamai.steamstatic.com/ee1ad5b2b6f15f599ec678700de100a882e6174b_full.jpg"
+                             class="rounded mx-auto d-block" id="steam_profile_avatar">
+                    </div>
+                </div>
+            </div>
+            <div class="col d-grid">
+                <div class="d-flex flex-column justify-content-center h-100">
+                    <div class="row">
+                        <h4 id="steam_profile_id">жаба.png</h4>
+                    </div>
+                    <div class="row ">
+                        <a href="https://steamcommunity.com/profiles/76561198192279965/" class="link-primary"
+                           id="steam_profile_url">https://steamcommunity.com/profiles/76561198192279965/</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row gap-2">
+            <div class="col d-grid gap-3 text-center">
+                <h3 id="time_until_delivery">Через 1 м 43 с</h3>
+                <button type="button" class="btn btn-primary w-100 btn-lg" onclick="forceStartDelivery()">⚡️
+                    Ускорить доставку
+                    ⚡️
+                </button>
+                <button type="button" class="btn btn-primary w-100 btn-lg">Пауза</button>
+
+            </div>
+        </div>
+        <div class="row gap-5">
+            <div class="col d-grid gap-3 text-center">
+                <h4>Это не ваш профиль?</h4>
+                <input type="text" class="form-control" placeholder="Новая ссылка на профиль"
+                       id="new_steam_profile_url">
+                <button type="button" class="btn btn-primary w-100 btn-lg" onclick="changeSteamProfileURL()"
+                        id="change_steam_profile_url">Обновить
+                </button>
+
+
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<div class="d-none" id="delivery_view">
+    <div class="d-grid gap-5">
+        <div class="row-md-auto text-center align-items-center">
+            <h1 class="display-6 text-primary"><i class="bi bi-truck">&nbsp;</i>Доставка</h1>
+        </div>
+        <div class="d-grid border gap-2 rounded p-4 shadow bg-body-tertiary" id="delivery_view_info">
+            <div class="d-flex bg-body border rounded p-3 gap-3 bg-body justify-content-between">
+                <div class="col-3">
+                    <img src="https://avatars.akamai.steamstatic.com/ee1ad5b2b6f15f599ec678700de100a882e6174b_full.jpg"
+                         class="img-fluid border rounded" id="courier_avatar">
+                </div>
+                <div class="col-9">
+                    <p class="h5" id="courier_name"></p>
+                    <a href="#">Открыть профиль</a>
+                </div>
+            </div>
+
+            <div class="d-grid mt-2" id="delivery_status"></div>
+        </div>
+        <div class="d-grid border rounded p-4 d-none shadow" id="delivery_view_error">
+            <div class="d-grid">
+                <span id="error_message" class="text-danger lead text-center"></span>
+                <a href="181885724" class="btn btn-outline-primary w-100 btn-lg mt-3" role="button" id="back_to_seller">Переписка
+                    с продавцом</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="d-none" id="delivery_done_view">
+    <div class="d-grid gap-3">
+        <div class="row-md-auto text-center align-items-center">
+            <h1 class="display-6 text-primary"><i class="bi bi-check-circle">&nbsp;</i>Ваш товар успешно доставлен</h1>
+        </div>
+        <div class="d-grid border rounded p-4 bg-light">
+            <div class="d-grid text-center h5">⚡️ Не забудьте оставить отзыв :) ⚡️</div>
+            <a href="181885724" class="btn btn-outline-primary w-100 btn-lg mt-3" role="button" id="back_to_order">Вернуться
+                к заказу</a>
+        </div>
+    </div>
+</div>
+<div class="flex-column align-self-end justify-content-center text-center">
+
+    <p>&copy; 2023 Aoki Store</p>
+</div>
+
+<script src="js/code.jquery.com_jquery-3.7.0.min.js"></script>
+<script src="bootstrap/js/bootstrap.bundle.js"></script>
+<script src="js/helpers.js"></script>
+<script src="js/bootstrap_elements.js"></script>
+
+<script>
+    const status_messages = [
+        'Отправка приглашения в друзья...',
+        'Ожидание принятия заявки в друзья...',
+        'Отправляем вам подарок...',
+        'Успешно доставлено'
+    ];
+
+    const status_descriptions = []
+
+
+    const error_messages = [
+        'У вас уже есть эта игра.',
+        'Произошла неизвестная ошибка во время передачи игры вам.',
+        'Вы не приняли приглашение.',
+        'Ваш профиль закрыт. Сделайте пофиль открытым/публичным и обновите страницу.',
+        'Не удалось добавить вас в друзья. Свяжитесь с продавцом.',
+        'На странице с товаром не указана ссылка на товар в Steam. Свяжитесь с продавцом.'
+    ]
+    const urlParams = new URLSearchParams(window.location.search);
+    const uniquecode = urlParams.get('uniquecode');
+
+    // Иницииализируются в запросах
+    let delivery = {};
+    let purchase = {};
+    let time_until_delivery = 'notset';
+
+    let delivery_view = $('#delivery_view');
+    let delivery_done_view = $('#delivery_done_view');
+    let main_view = $('#main_view');
+    let error_view = $('#delivery_view_error');
+    let spinner = $('#spinner');
+
+    let delivery_statuses = [];
+    let status_rows = [];
+
+    let courier_steam_profile = {};
+
+    $(document).ready(function () {
+        onLoadingStart();
+    });
+
+
+    function onLoadingStart() {
+        $.when(getDelivery(), getCourierSteamProfile()).done(() => {
+            $.when(getSteamProfileInfo(), getTimeUntilDelivery()).done(() => {
+                $('#back_to_order').attr('href', 'https://digiseller.market/info/buy.asp?id_i=' + purchase.inv)
+                $('#back_to_seller').attr('href', 'https://digiseller.market/info/buy.asp?id_i=' + purchase.inv)
+                fadeOut(spinner, () => {
+                    // Подарок был успешно отправлен.
+                    if (delivery.status === 4) {
+                        fadeIn(delivery_done_view)
+                    // Если доставка ещё не началась.
+                    } else if (time_until_delivery) {
+                        fadeIn(main_view, onLoadingDone);
+                    // Если доставка началась.
+                    } else {
+                        openDeliveryStatusView();
+                    }
+                });
+            });
+        });
+    }
+
+    function openDeliveryStatusView() {
+
+        // $('#steam_profile_url').html(steam_user.profile_url);
+        $('#courier_name').html(courier_steam_profile.id);
+        $('#courier_avatar').attr('src', courier_steam_profile.avatar_url);
+        if (delivery.error) {
+            showDeliveryError();
+        } else {
+            setInterval(checkForNewDeliveryStatus, 1000);
+        }
+        fadeIn(delivery_view);
+
+    }
+
+    function showDeliveryError() {
+        $('#error_message').html(error_messages[delivery.error]);
+        $('#delivery_status').html('');
+        if (isHidden(error_view)) {
+            fadeIn(error_view);
+        }
+    }
+
+    function fadeIn(element, done = () => {
+    }) {
+        element.hide();
+        element.removeClass('d-none');
+        element.fadeIn(100, done);
+    }
+
+    function fadeOut(element, done = () => {
+    }) {
+        element.fadeOut(100, () => {
+            element.hide();
+            element.addClass('d-none');
+            done();
+        });
+    }
+
+    function isHidden(element) {
+        return element.hasClass('d-none');
+    }
+
+    function onLoadingDone() {
+        window.setInterval(getTimeUntilDelivery, 1000);
+    }
+
+    function getDelivery() {
+
+        return api('/deliveries/get', {'code': uniquecode}, (result) => {
+            delivery = result.delivery;
+            purchase = result.purchase;
+            console.log(purchase);
+        });
+    }
+
+    function getCourierSteamProfile() {
+        return api('/get_courier_steam_profile', {}, (result) => {
+            courier_steam_profile = result.profile;
+        });
+    }
+
+    function getSteamProfileInfo() {
+        return api('/get_steam_profile_info', {'steam_profile_url': delivery.steam_profile_url}, (steam_user) => {
+            $('#steam_profile_url').html(steam_user.profile_url);
+            $('#steam_profile_id').html(steam_user.id);
+            $('#steam_profile_avatar').attr('src', steam_user.avatar_url);
+        });
+    }
+
+    function changeSteamProfileURL() {
+        const change_steam_profile_url_btn = $('#change_steam_profile_url')
+        const new_steam_profile_url_input = $('#new_steam_profile_url')
+
+        change_steam_profile_url_btn.prop('disabled', true);
+        new_steam_profile_url_input.prop('disabled', true);
+
+        const button_normal_html = change_steam_profile_url_btn.html()
+        change_steam_profile_url_btn.html(spinnerLabel('Проверка...'));
+
+        data = {
+            'code': uniquecode,
+            'steam_profile_url': new_steam_profile_url_input.val()
+        }
+        return api('/deliveries/set_steam_profile_url', data, (result) => {
+            if (result.error) {
+                alert(result.error);
+            } else {
+                onLoadingStart();
+            }
+            change_steam_profile_url_btn.prop('disabled', false);
+            new_steam_profile_url_input.prop('disabled', false);
+            new_steam_profile_url_input.val('');
+            change_steam_profile_url_btn.html(button_normal_html);
+
+        });
+    }
+
+
+    function getTimeUntilDelivery() {
+        if (time_until_delivery) {
+            return api('/deliveries/get_time_until_delivery', {'code': uniquecode}, (result) => {
+                time_until_delivery = result.time;
+                if (result.time) {
+                    $('#time_until_delivery').html('Доставка начнется <span class="lead">через ' + result.time + '</span>');
+                } else if (delivery.status !== 4) {
+                    main_view.fadeOut(100, () => {
+                        openDeliveryStatusView();
+                        for (let i = 0; i < delivery.status; i++) {
+                            addDeliveryStatus(i);
+                        }
+                    });
+                }
+            });
+        }
+    }
+
+    function addDeliveryStatus(status) {
+        if (status_rows.length > 0) {
+            const previous_status_row = status_rows[status_rows.length - 1];
+            previous_status_row.find('div[name="status"]').html('<i class="bi bi-check text-success" style="font-size: 2rem;"></i>');
+            previous_status_row.find('span[name="label"]').addClass('text-success');
+        }
+
+        const label = status_messages[status];
+        let status_row = $('<div class="row justify-content-between d-none align-items-center" id="' + 'status_' + status + '">' +
+            '<div class="col-sm-1" ><div class="d-flex justify-content-center align-items-center" name="status" style="width: 32px; height: 32px;"><div class="spinner-border spinner-border-sm"></div></div></div>' +
+            '<div class="col-auto" ><span class="lead" name="label">' + label + '</span></div></div>');
+
+        $('#delivery_status').append(status_row);
+        status_row = $('#status_' + status);
+        status_rows.push(status_row);
+
+        status_row.hide();
+        status_row.removeClass('d-none');
+        status_row.fadeIn(100);
+    }
+
+    function forceStartDelivery() {
+        return api('/deliveries/force_start', {'code': uniquecode}, (result) => {
+
+        });
+    }
+
+    function updateDeliveryStatus(new_status) {
+        for (let i = delivery.status; i < new_status; i++) {
+            addDeliveryStatus(i);
+        }
+        delivery.status = new_status;
+    }
+
+    function stopTimers() {
+        let maxId = setTimeout(function () {
+        }, 0);
+
+        for (let i = 0; i < maxId; i += 1) {
+            clearTimeout(i);
+        }
+    }
+
+
+    let making_request = false;
+
+    function checkForNewDeliveryStatus() {
+        const data = {'code': uniquecode, 'delivery_status': delivery.status};
+        if (!making_request) {
+            making_request = true;
+            return api('/deliveries/check_for_new_status', data, (result) => {
+                if (result.new_status >= 0) {
+                    if (result.new_status === 4) {
+                        delivery_view.fadeOut(100);
+                        fadeIn(delivery_done_view);
+                        stopTimers();
+                    } else {
+                        updateDeliveryStatus(result.new_status);
+                    }
+
+                }
+                if (result.error) {
+                    delivery.error = result.error;
+                    showDeliveryError();
+                }
+                making_request = false;
+            });
+        }
+
+    }
+
+</script>
+</body>
+</html>

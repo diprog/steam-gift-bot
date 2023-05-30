@@ -52,15 +52,32 @@ class AuthContext:
 
 
 class Steam(Chrome):
-    def __init__(self, remote_debugging_host: str):
-        """
-        Инициализация объекта Steam. Используется удаленный хост для отладки.
-        :param remote_debugging_host: адрес удаленного хоста для отладки
-        """
-        super().__init__(remote_debugging_host)
+    def __init__(self, remote_debugging_port: Optional[int] = None, user_data_dir: Optional[str] = None,
+                 login: Optional[str] = None, password: Optional[str] = None):
+        super().__init__(remote_debugging_port, user_data_dir)
+        self.login = login
+        self.password = password
+        self.friends = []
+
+    async def fill_auth_form_and_submit(self, page: Page):
+        # Вводим логин и пароль.
+        form_inputs_selector = '//input[@class="newlogindialog_TextInput_2eKVn"]'
+        await page.wait_for_selector(form_inputs_selector)
+        elements = await page.query_selector_all(form_inputs_selector)
+        await elements[0].fill(self.login)
+        await elements[1].fill(self.password)
+
+        # Нажимаем на чекбокс "Запомнить меня", если он не активен.
+        remember_me_checkbox = await page.query_selector('//div[@class="newlogindialog_Checkbox_3tTFg"]')
+        is_enabled = (await remember_me_checkbox.inner_html()) != ''
+        if not is_enabled:
+            await remember_me_checkbox.click()
+
+        # нажимаем на кнопку "Войти".
+        await page.click('//button[@class="newlogindialog_SubmitButton_2QgFE"]')
 
     @asynccontextmanager
-    async def auth_start(self, login: str, password: str) -> AsyncIterator[AuthContext]:
+    async def auth_start(self) -> AsyncIterator[AuthContext]:
         """
         Это менеджер контекста, поэтому используйте `async with start_auth() as auth`.
         Для завершения авторизации используйте метод auth_steam_guard_code внутри этого контекста.
@@ -77,22 +94,8 @@ class Steam(Chrome):
                 steam_login = await page.text_content('//span[@class="persona online"]')
                 raise AlreadyAuthorizedError(steam_login)
 
-            # Вводим логин и пароль.
-            form_inputs_selector = '//input[@class="newlogindialog_TextInput_2eKVn"]'
-            await page.wait_for_selector(form_inputs_selector)
-            elements = await page.query_selector_all(form_inputs_selector)
-            await elements[0].fill(login)
-            await elements[1].fill(password)
-
-            # Нажимаем на чекбокс "Запомнить меня", если он не активен.
-            remember_me_checkbox = await page.query_selector('//div[@class="newlogindialog_Checkbox_3tTFg"]')
-            is_enabled = (await remember_me_checkbox.inner_html()) != ''
-            if not is_enabled:
-                await remember_me_checkbox.click()
-
-            # нажимаем на кнопку "Войти".
             auth_context.code_requested_ts = time.time()
-            await page.click('//button[@class="newlogindialog_SubmitButton_2QgFE"]')
+            await self.fill_auth_form_and_submit(page)
             await page.wait_for_load_state('networkidle')
 
             # Если аккаунт сразу авторизовало, не потребовав ввести код Steam Guard.
@@ -155,6 +158,29 @@ class Steam(Chrome):
                     print(convert_russian_datetime(datetime_string))
                 await asyncio.sleep(10)
 
+    async def get_my_id64(self):
+        cookies = await self.context.cookies('https://steamcommunity.com')
+        for cookie in cookies:
+            if cookie['name'] == 'steamLoginSecure':
+                return cookie['value'].split('%', 1)[0]
+
+    async def get_my_profile_url(self):
+        my_id64 = await self.get_my_id64()
+        return f'https://steamcommunity.com/profiles/{my_id64}'
+
+    async def get_my_friends(self):
+        """
+        :return: Список, состоящий из ID64 друзей.
+        """
+        my_profile_url = await self.get_my_profile_url()
+        page = await self.context.new_page()
+        try:
+            await page.goto(my_profile_url + '/friends')
+            elements = await page.query_selector_all('//div[@id="search_results"]//div[@data-steamid]')
+            self.friends = [int((await e.get_attribute('data-steamid'))) for e in elements]
+        finally:
+            await page.close()
+
     async def get_self(self) -> str | None:
         """
         Проверяет, авторизован ли текущий аккаунт Steam.
@@ -183,28 +209,167 @@ class Steam(Chrome):
         finally:
             await page.close()
 
-    async def buy_game(self, game_url: str):
+    async def clear_cart(self):
         page = await self.context.new_page()
-        await page.goto(game_url, wait_until='networkidle')
-        await page.click('//a[@id="btn_add_to_cart_65766"]')
-        await page.wait_for_url('**/cart/', wait_until='networkidle')
-        await page.click('//a[@id="btn_purchase_self"]')
-        logging.info('Ждем')
-        await asyncio.sleep(10000)
+        try:
+            await page.goto('https://store.steampowered.com/cart/')
 
-    async def send_friend_invite(self, user_url: str):
+            # Проверяем, есть ли вообще что-то в корзине.
+            cart_button = await page.wait_for_selector('//div[@id="store_header_cart_btn"]', state='attached')
+
+            # Корзина уже пустая
+            if await cart_button.get_attribute('style'):
+                return
+
+            # Очищаем корзину. Нажимаем на "Удалить все товары" и подтверждаем действие.
+            await page.click('//div[@class="remove_ctn"]')
+            await page.click('//div[@class="btn_green_steamui btn_medium"]')
+            await page.wait_for_load_state('load')
+        finally:
+            await page.close()
+
+    async def gift_game(self, game_url: str, user_steam_id3: int, credit_card_cvv: int):
+        """
+        Асинхронная функция для покупки игры на Steam по URL игры и последующего подарка пользователю.
+
+        :param game_url: Строка, представляющая URL страницы игры в магазине Steam.
+        :param user_steam_id3: Целочисленное значение, представляющее steamID3 пользователя, которому следует подарить игру.
+        :param credit_card_cvv: Целочисленное значение, представляющее CVV кредитной карты.
+        """
+
+        # Создаем новую вкладку
+        page = await self.context.new_page()
+        try:
+            # Переходим на страницу игры
+            await page.goto(game_url, wait_until='load')
+            # Нажимаем кнопку "Добавить в корзину"
+            add_to_cart_btn = await self.find_addtocart_button(page)
+            try:
+                async with self.context.expect_page(timeout=2000) as new_page_info:
+                    await add_to_cart_btn.click()  # Opens a new tab
+                page = await new_page_info.value
+            except TimeoutError:
+                pass
+
+            # Нажимаем кнопку "Купить в подарок"
+            await page.click('#btn_purchase_gift')
+            await page.wait_for_load_state('networkidle')
+
+            # Если требуется повторная авторизация, заполняем форму.
+            if 'login' in page.url:
+                await self.fill_auth_form_and_submit(page)
+
+            # Выбираем пользователя, которому хотим подарить игру.
+            xpath = f'//img[@data-miniprofile="{user_steam_id3}"]'
+            friend_select_option = await page.wait_for_selector(xpath)
+            if await page.query_selector(xpath + '/../..//div[@class="friend_ownership_info already_owns"]'):
+                raise AlreadyOwnsGameError
+            await friend_select_option.click()
+
+            # Нажимаем кнопку "Продолжить"
+            await page.click('//a[@class="btnv6_green_white_innerfade btn_medium"]')
+
+            # Заполняем поля формы
+            await page.fill('//input[@id="gift_recipient_name"]', 'Клиенту')  # Имя получателя
+            await page.fill('//textarea[@id="gift_message_text"]',
+                            'Приятной игры! Не забудьте оставить отзыв о нашем сервисе. Благодарим Вас за покупку. С уважением, Aoki Store.')  # Записка к подарку (не более 160 символов)
+            await page.fill('//input[@id="gift_signature"]', 'Aoki Store')  # Подпись отправителя
+            await page.click('//a[@id="submit_gift_note_btn"]')
+
+            try:
+                # Вводим CVV кредитной карты
+                await page.fill('#security_code_cached', str(credit_card_cvv), timeout=5000)
+            except TimeoutError:
+                pass
+            # Принимаем условия лицензионного соглашения
+            await page.click('#accept_ssa')
+            # Совершаем покупку игры
+            # await page.click('//a[@id="purchase_button_bottom"]')
+        finally:
+            await page.close()
+
+    async def send_friend_invite(self, user_url: str) -> int | None:
+        """
+        Асинхронная функция для отправки приглашения в друзья на Steam по URL профиля пользователя.
+
+        :param user_url: Строка, представляющая URL профиля пользователя Steam.
+        :return: Возвращает целочисленное значение последней части steamID3 в случае успешной отправки приглашения, иначе None.
+        :raises UserProfileNotPublicError: Выбрасывает исключение, если профиль пользователя закрыт.
+        :raises UserFriendInviteFailed: Выбрасывает исключение, если отправка приглашения в друзья не удалась.
+        """
+
+        # Извлекаем информацию о пользователе по предоставленному URL
         user = await get_user_by_url(user_url)
 
+        # Проверяем, открыт ли профиль пользователя
         if not user.public:
             raise UserProfileNotPublicError
 
+        # Открываем новую страницу и переходим по URL профиля пользователя
         page = await self.context.new_page()
-        await page.goto(user_url, wait_until='networkidle')
-        async with page.expect_response('**/AddFriendAjax') as response_info:
-            await page.click('//a[@id="btn_add_friend"]')
-        response = await response_info.value
-        json = await response.json()
-        if response.status == 400:
-            if json.get('failed_invites'):
-                if user.id64 in json['failed_invites']:
-                    raise UserFriendInviteFailed(await page.text_content('//div[@class="newmodal_content"]'))
+        try:
+            await page.goto(user_url, wait_until='networkidle')
+
+            steam_id3 = int(
+                await page.get_attribute(
+                    '//div[@class="playerAvatar profile_header_size online"]|//div[@class="playerAvatar profile_header_size offline"]',
+                    'data-miniprofile'))
+            # Находим кнопку "Добавить в друзья"
+            invite_friend_btn = await page.query_selector('//a[@id="btn_add_friend"]')
+
+            if not invite_friend_btn:
+                raise IsFriendAlreadyError(steam_id3)
+            elif 'CancelInvite' in await invite_friend_btn.get_attribute('href'):
+                raise AlreadySentFriendRequestError
+            # Инициируем ожидание ответа сервера после нажатия на кнопку "Добавить в друзья"
+            async with page.expect_response('**/AddFriendAjax') as response_info:
+                await invite_friend_btn.click()
+            response = await response_info.value
+            json = await response.json()
+
+            # Обработка ответа от сервера
+            if response.status == 200:
+                logging.info(f'Steam - Запрос в друзья успешно отправлен пользователю "{user.id}" ({user.id64})')
+                return steam_id3
+            elif response.status == 400:
+                # Если отправка приглашения не удалась, проверяем, существует ли в ответе информация о неудачных приглашениях
+                if json.get('failed_invites'):
+                    if user.id64 in json['failed_invites']:
+                        raise UserFriendInviteFailed(await page.text_content('//div[@class="newmodal_content"]'),
+                                                     user_url)
+            else:
+                # Логируем неожиданный статус ответа
+                logging.error(response.status)
+        finally:
+            await page.close()
+
+    async def wait_for_friend_request_accept(self, user_steam_id64, timeout=60 * 10):
+        timeout_time = time.time() + timeout
+        while time.time() < timeout_time:
+            print(user_steam_id64, self.friends)
+            if int(user_steam_id64) in self.friends:
+                return True
+            await asyncio.sleep(1)
+        return False
+
+    def start_friend_list_updater(self):
+        async def updater():
+            while True:
+                await self.get_my_friends()
+                await asyncio.sleep(10)
+
+        asyncio.create_task(updater())
+
+    async def remove_frined(self, profile_url: str):
+        page = await self.context.new_page()
+        try:
+            await page.goto(profile_url)
+            await page.click('//span[@id="profile_action_dropdown_link"]')
+            await asyncio.sleep(1)
+            await page.click('//a[@href="javascript:RemoveFriend();"]')
+            async with page.expect_response('**RemoveFriendAjax') as response_info:
+                await page.click('//div[@class="btn_green_steamui btn_medium"]')
+            response = await response_info.value
+            await self.get_my_friends()
+        finally:
+            await page.close()

@@ -16,11 +16,34 @@ class SteamGuardCodeFormatError(Exception):
     """
     ...
 
+
 class MailRuLoginError(Exception):
     ...
+
 
 class UserProfileNotPublicError(Exception):
     ...
 
+
 class UserFriendInviteFailed(Exception):
+    ...
+
+
+class UserNotFoundError(Exception):
+    ...
+
+
+class UserProfileURLError(Exception):
+    ...
+
+
+class IsFriendAlreadyError(Exception):
+    def __init__(self, friend_id3: int):
+        self.friend_id3 = friend_id3
+
+
+class AlreadyOwnsGameError(Exception):
+    ...
+
+class AlreadySentFriendRequestError(Exception):
     ...

@@ -55,3 +55,45 @@ def convert_russian_datetime(russian_datetime_str: str) -> datetime:
     dt = dt.replace(tzinfo=pytz.UTC)
 
     return dt
+
+
+def get_current_moscow_date_string():
+    # Создаем объект часового пояса для Москвы
+    moscow_tz = pytz.timezone('Europe/Moscow')
+
+    # Получаем текущую дату и время в этом часовом поясе
+    current_datetime = datetime.now(moscow_tz)
+    return current_datetime.strftime('%Y-%m-%d %H:%M:%S')
+
+
+def find_steam_product_url(text: str, splitter: str):
+    print(text)
+    for part in text.split(splitter):
+        if '/' in part:
+            return part.split()[0]
+
+
+def format_duration(seconds):
+    parts = []
+
+    hours = seconds // 3600
+    if hours > 0:
+        parts.append(russian_plural(hours, ['час', 'часа', 'часов']))
+
+    minutes = (seconds % 3600) // 60
+    if minutes > 0:
+        parts.append(russian_plural(minutes, ['минуту', 'минуты', 'минут']))
+
+    seconds = seconds % 60
+    parts.append(russian_plural(seconds, ['секунду', 'секунды', 'секунд']))
+
+    return ' '.join(parts)
+
+def russian_plural(n, forms):
+    if n % 10 == 1 and n % 100 != 11:
+        form = 0
+    elif 2 <= n % 10 <= 4 and (n % 100 < 10 or n % 100 >= 20):
+        form = 1
+    else:
+        form = 2
+    return f"{n} {forms[form]}"
