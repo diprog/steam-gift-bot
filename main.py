@@ -53,7 +53,7 @@ async def check_steam(request: web.Request):
 
 
 async def handle_delivery(digiseller: Digiseller, steam: Steam, delivery: db.deliveries.Delivery):
-    await delivery.set_status(DeliveryStatus.SENDING_FRIEND_INVITE)
+    await delivery.set_status(DeliveryStatus.GETTING_PURCHASE_INFO)
     purchase = await digiseller.get_purchase_by_code(delivery.digiseller_code)
     product = await digiseller.get_product(purchase['id_goods'])
     steam_product_url = find_steam_product_url(product['info'], 'Подробнее о товаре: ')
@@ -62,6 +62,7 @@ async def handle_delivery(digiseller: Digiseller, steam: Steam, delivery: db.del
         await delivery.seterror(5)
         return
     try:
+        await delivery.set_status(DeliveryStatus.SENDING_FRIEND_INVITE)
         try:
             await steam.send_friend_invite(delivery.steam_profile_url)
         except IsFriendAlreadyError:
@@ -102,11 +103,13 @@ async def handle_delivery(digiseller: Digiseller, steam: Steam, delivery: db.del
 async def polling(steam: Steam, digiseller: Digiseller):
     print('Поллинг')
     while True:
-        deliveries = await db.deliveries.get(status=DeliveryStatus.WAITING_UNTIL_DELIVERY)
+        deliveries = await db.deliveries.get(status=[
+            DeliveryStatus.WAITING_UNTIL_DELIVERY
+        ])
         print(deliveries)
         for delivery in deliveries:
             print(delivery.get_time_until_delivery())
-            if delivery.get_time_until_delivery() <= 0:
+            if delivery.get_time_until_delivery() <= 0 and not delivery.paused:
                 asyncio.create_task(
                     handle_delivery(digiseller, steam, delivery))
         await asyncio.sleep(1)

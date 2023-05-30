@@ -9,10 +9,11 @@ storage = Storage('deliveries')
 
 class DeliveryStatus:
     WAITING_UNTIL_DELIVERY = 0
-    SENDING_FRIEND_INVITE = 1
-    AWAITING_FRIEND_INVITATION_ACCEPT = 2
-    SENDING_GIFT = 3
-    DELIVERED = 4
+    GETTING_PURCHASE_INFO = 1
+    SENDING_FRIEND_INVITE = 2
+    AWAITING_FRIEND_INVITATION_ACCEPT = 3
+    SENDING_GIFT = 4
+    DELIVERED = 5
 
 
 class Delivery:
@@ -21,6 +22,7 @@ class Delivery:
         self.status = status
         self.error = None
         self.delivery_time = None
+        self.time_left = None
         self.steam_profile_url = None
         self.paused = False
         self.set_delivery_time(delivery_delay)
@@ -37,6 +39,12 @@ class Delivery:
     async def seterror(self, error: int):
         await self.update(error=error)
 
+    async def pause(self):
+        await self.update(paused=True, time_left=self.delivery_time - time.time())
+
+    async def unpause(self):
+        await self.update(paused=False, delivery_time=time.time() + self.time_left)
+
     def set_delivery_time(self, seconds=60 * 2):
         self.delivery_time = time.time() + seconds
 
@@ -48,7 +56,7 @@ class Delivery:
         return dictionary
 
 
-async def get(digiseller_code: Optional[str] = None, status: Optional[int] = None) -> \
+async def get(digiseller_code: Optional[str] = None, status: Optional[int | list[int]] = None) -> \
         Optional[dict[str, Delivery] | Delivery | list[Delivery]]:
     """
     Асинхронная функция, которая возвращает информацию о доставках.
@@ -68,7 +76,9 @@ async def get(digiseller_code: Optional[str] = None, status: Optional[int] = Non
         return deliveries.get(digiseller_code, None)
     # Если указан статус, возвращаем список доставок с этим статусом
     elif status is not None:
-        return [delivery for delivery in deliveries.values() if delivery.status == status]
+        if type(status) is int:
+            status = [status]
+        return [delivery for delivery in deliveries.values() if delivery.status in status]
 
     # Если ничего не указано, возвращаем все доставки
     return deliveries

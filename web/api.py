@@ -38,8 +38,8 @@ async def get_purchase_info(request: web.Request):
         return
     delivery = await db.deliveries.get(digiseller_code) or await db.deliveries.create(digiseller_code)
     if not delivery.steam_profile_url:
-        # await delivery.update(steam_profile_url=purchase['options'][0]['value'])
-        await delivery.update(steam_profile_url='https://steamcommunity.com/profiles/76561198192279965/')
+        await delivery.update(steam_profile_url=purchase['options'][0]['value'])
+        # await delivery.update(steam_profile_url='https://steamcommunity.com/profiles/76561198192279965/')
     return web.json_response({'delivery': pickler.flatten(delivery), 'purchase': purchase})
 
 
@@ -58,7 +58,7 @@ async def get_time_until_delivery(request: web.Request):
     data = await request.post()
     digiseller_code = data['code']
     delivery = await db.deliveries.get(digiseller_code)
-    await delivery.update(delivery_time=time.time())
+    await delivery.update(delivery_time=time.time(), paused=False)
     return web.json_response({'ok': True})
 
 
@@ -67,7 +67,7 @@ async def get_time_until_delivery(request: web.Request):
     data = await request.post()
     digiseller_code = data['code']
     delivery = await db.deliveries.get(digiseller_code)
-    await delivery.update(pause=True)
+    await delivery.pause()
     return web.json_response({'ok': True})
 
 
@@ -76,7 +76,7 @@ async def get_time_until_delivery(request: web.Request):
     data = await request.post()
     digiseller_code = data['code']
     delivery = await db.deliveries.get(digiseller_code)
-    await delivery.update(pause=False)
+    await delivery.unpause()
     return web.json_response({'ok': True})
 
 

@@ -3,9 +3,9 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Bootstrap demo</title>
+    <title>Aoki Store</title>
     <link href="bootstrap/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <link href="css/icons/font/bootstrap-icons.min.css" rel="stylesheet">
     <link href="css/bootstrap.css" rel="stylesheet">
 </head>
 <body class="d-grid flex-column align-items-center justify-content-center min-vh-100">
@@ -13,7 +13,7 @@
     <div class="spinner-border text-primary" role="status"></div>
 </div>
 <div class="d-none m-5" id="main_view">
-    <div class="d-grid gap-5 border rounded p-4 bg-body-tertiary shadow" >
+    <div class="d-grid gap-5 border rounded p-4 bg-body-tertiary shadow">
         <div class="row border rounded bg-body p-3 gap-3">
             <div class="col-2 d-grid">
                 <div class="d-flex flex-column justify-content-center h-100">
@@ -38,11 +38,19 @@
         <div class="row gap-2">
             <div class="col d-grid gap-3 text-center">
                 <h3 id="time_until_delivery">Через 1 м 43 с</h3>
-                <button type="button" class="btn btn-primary w-100 btn-lg" onclick="forceStartDelivery()">⚡️
-                    Ускорить доставку
-                    ⚡️
-                </button>
-                <button type="button" class="btn btn-primary w-100 btn-lg">Пауза</button>
+                <div class="row">
+                    <div class="col-6" id="pause_button">
+                        <button type="button" class="btn btn-primary primary w-100 btn-lg" onclick="pauseDelivery()"><i
+                                class="bi bi-pause-fill">&nbsp;</i>Остановить таймер
+                        </button>
+                    </div>
+                    <div class="col">
+                        <button type="button" class="btn btn-primary w-100 btn-lg" onclick="forceStartDelivery()"
+                                id="force_start_button"><i
+                                class="bi bi-fast-forward-fill">&nbsp;</i>Ускорить доставку
+                        </button>
+                    </div>
+                </div>
 
             </div>
         </div>
@@ -63,7 +71,7 @@
 </div>
 
 <div class="d-none" id="delivery_view">
-    <div class="d-grid gap-5">
+    <div class="d-grid gap-3">
         <div class="row-md-auto text-center align-items-center">
             <h1 class="display-6 text-primary"><i class="bi bi-truck">&nbsp;</i>Доставка</h1>
         </div>
@@ -75,7 +83,7 @@
                 </div>
                 <div class="col-9">
                     <p class="h5" id="courier_name"></p>
-                    <a href="#">Открыть профиль</a>
+                    <a href="#" target="_blank" id="courier_steam_url">Открыть профиль</a>
                 </div>
             </div>
 
@@ -84,7 +92,7 @@
         <div class="d-grid border rounded p-4 d-none shadow" id="delivery_view_error">
             <div class="d-grid">
                 <span id="error_message" class="text-danger lead text-center"></span>
-                <a href="181885724" class="btn btn-outline-primary w-100 btn-lg mt-3" role="button" id="back_to_seller">Переписка
+                <a href="#" class="btn btn-outline-primary w-100 btn-lg mt-3" role="button" id="back_to_seller">Переписка
                     с продавцом</a>
             </div>
         </div>
@@ -115,6 +123,7 @@
 
 <script>
     const status_messages = [
+        'Получение информации о покупке...',
         'Отправка приглашения в друзья...',
         'Ожидание принятия заявки в друзья...',
         'Отправляем вам подарок...',
@@ -145,6 +154,7 @@
     let main_view = $('#main_view');
     let error_view = $('#delivery_view_error');
     let spinner = $('#spinner');
+    let pause_button = $('#pause_button');
 
     let delivery_statuses = [];
     let status_rows = [];
@@ -163,12 +173,15 @@
                 $('#back_to_seller').attr('href', 'https://digiseller.market/info/buy.asp?id_i=' + purchase.inv)
                 fadeOut(spinner, () => {
                     // Подарок был успешно отправлен.
-                    if (delivery.status === 4) {
-                        fadeIn(delivery_done_view)
-                    // Если доставка ещё не началась.
+                    if (delivery.status === 5) {
+                        fadeIn(delivery_done_view);
+                        // Если доставка ещё не началась.
+                    } else if (delivery.paused) {
+                        pauseState();
+                        fadeIn(main_view);
                     } else if (time_until_delivery) {
                         fadeIn(main_view, onLoadingDone);
-                    // Если доставка началась.
+                        // Если доставка началась.
                     } else {
                         openDeliveryStatusView();
                     }
@@ -178,10 +191,9 @@
     }
 
     function openDeliveryStatusView() {
-
-        // $('#steam_profile_url').html(steam_user.profile_url);
         $('#courier_name').html(courier_steam_profile.id);
         $('#courier_avatar').attr('src', courier_steam_profile.avatar_url);
+        $('#courier_steam_url').attr('href', courier_steam_profile.profile_url);
         if (delivery.error) {
             showDeliveryError();
         } else {
@@ -224,7 +236,6 @@
     }
 
     function getDelivery() {
-
         return api('/deliveries/get', {'code': uniquecode}, (result) => {
             delivery = result.delivery;
             purchase = result.purchase;
@@ -241,19 +252,20 @@
     function getSteamProfileInfo() {
         return api('/get_steam_profile_info', {'steam_profile_url': delivery.steam_profile_url}, (steam_user) => {
             $('#steam_profile_url').html(steam_user.profile_url);
+            $('#steam_profile_url').attr('href', steam_user.profile_url);
             $('#steam_profile_id').html(steam_user.id);
             $('#steam_profile_avatar').attr('src', steam_user.avatar_url);
         });
     }
 
     function changeSteamProfileURL() {
-        const change_steam_profile_url_btn = $('#change_steam_profile_url')
-        const new_steam_profile_url_input = $('#new_steam_profile_url')
+        const change_steam_profile_url_btn = $('#change_steam_profile_url');
+        const new_steam_profile_url_input = $('#new_steam_profile_url');
 
         change_steam_profile_url_btn.prop('disabled', true);
         new_steam_profile_url_input.prop('disabled', true);
 
-        const button_normal_html = change_steam_profile_url_btn.html()
+        const button_normal_html = change_steam_profile_url_btn.html();
         change_steam_profile_url_btn.html(spinnerLabel('Проверка...'));
 
         data = {
@@ -270,13 +282,12 @@
             new_steam_profile_url_input.prop('disabled', false);
             new_steam_profile_url_input.val('');
             change_steam_profile_url_btn.html(button_normal_html);
-
         });
     }
 
 
     function getTimeUntilDelivery() {
-        if (time_until_delivery) {
+        if (time_until_delivery && !delivery.paused) {
             return api('/deliveries/get_time_until_delivery', {'code': uniquecode}, (result) => {
                 time_until_delivery = result.time;
                 if (result.time) {
@@ -316,7 +327,8 @@
 
     function forceStartDelivery() {
         return api('/deliveries/force_start', {'code': uniquecode}, (result) => {
-
+            delivery.paused = false;
+            getTimeUntilDelivery();
         });
     }
 
@@ -345,7 +357,7 @@
             making_request = true;
             return api('/deliveries/check_for_new_status', data, (result) => {
                 if (result.new_status >= 0) {
-                    if (result.new_status === 4) {
+                    if (result.new_status === 5) {
                         delivery_view.fadeOut(100);
                         fadeIn(delivery_done_view);
                         stopTimers();
@@ -362,6 +374,20 @@
             });
         }
 
+    }
+
+    function pauseDelivery() {
+        stopTimers();
+        return api('/deliveries/pause', {'code': uniquecode}, (result) => {
+            delivery.paused = true;
+            pauseState();
+        });
+    }
+
+    function pauseState() {
+        $('#pause_button').remove();
+        $('#force_start_button').html('<i class="bi bi bi-play-fill">&nbsp;</i>Начать доставку');
+        $('#time_until_delivery').html('<span class="lead text-wrap">Вы остановили таймер.<br>Нажмите на кнопку <b>"Начать доставку"</b>, чтобы получить свой товар.</span>');
     }
 
 </script>

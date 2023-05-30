@@ -1,3 +1,4 @@
+import platform
 from datetime import datetime
 
 import pytz
@@ -89,6 +90,7 @@ def format_duration(seconds):
 
     return ' '.join(parts)
 
+
 def russian_plural(n, forms):
     if n % 10 == 1 and n % 100 != 11:
         form = 0
@@ -97,3 +99,12 @@ def russian_plural(n, forms):
     else:
         form = 2
     return f"{n} {forms[form]}"
+
+
+def get_chrome_executable_path():
+    if platform.system() == 'Windows':
+        return r'C:\Program Files\Google\Chrome\Application\chrome.exe'
+    elif platform.system() == 'Linux':
+        return '/usr/bin/google-chrome'
+    else:
+        raise OSError('Unsupported operating system')
