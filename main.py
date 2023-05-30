@@ -27,6 +27,10 @@ gift_semaphore = asyncio.Semaphore(1)
 async def delivery_page(request: web.Request):
     return web.Response(text=open('html/delivery.html', 'r', encoding='utf-8').read(), content_type='text/html')
 
+@routes.get('/panel')
+async def admin_panel_page(request: web.Request):
+    return web.Response(text=open('html/panel.html', 'r', encoding='utf-8').read(), content_type='text/html')
+
 @routes.get('/')
 async def index_page(request: web.Request):
     return web.Response(text=open('html/index.html', 'r', encoding='utf-8').read(), content_type='text/html')
