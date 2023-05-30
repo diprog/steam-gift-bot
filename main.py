@@ -9,8 +9,10 @@ import constants
 import db
 from db.models.deliveries import DeliveryStatus
 from digiseller.api import Digiseller
+from display import start_display, stop_display
 from steam import get_user_by_url, UserNotFoundError, Steam, IsFriendAlreadyError, \
-    UserProfileNotPublicError, AlreadyOwnsGameError, UserFriendInviteFailed, AlreadySentFriendRequestError
+    UserProfileNotPublicError, AlreadyOwnsGameError, UserFriendInviteFailed, AlreadySentFriendRequestError, AuthContext, \
+    AlreadyAuthorizedError
 from steam.utils import find_steam_profile_url_in_text
 from utils import find_steam_product_url
 from web.api import api_routes
@@ -116,20 +118,21 @@ async def polling(steam: Steam, digiseller: Digiseller):
 
 
 async def on_startup(app):
+    start_display()
     steam = await Steam(user_data_dir='.chrome', login='aoki_kz1', password='a0dEsTNYk_').__aenter__()
-    # try:
-    #     auth: AuthContext
-    #     async with steam.auth_start() as auth:
-    #         if auth.steam_guard_required:
-    #             ...
-    #             # code = await steam.get_steam_guard_code_from_mailru('aoki5179@aokiplus.store', '7-Ii0HRtbh',
-    #             #                                                     auth.code_requested_ts)
-    #             # await auth.enter_auth_steam_guard_code(code)
-    # except AlreadyAuthorizedError as e:
-    #     logging.info(f'Steam - Авторизован как {e.login}')
-    # except RuntimeError:
-    #     pass
-    #
+    try:
+        auth: AuthContext
+        async with steam.auth_start() as auth:
+            if auth.steam_guard_required:
+                ...
+                # code = await steam.get_steam_guard_code_from_mailru('aoki5179@aokiplus.store', '7-Ii0HRtbh',
+                #                                                     auth.code_requested_ts)
+                # await auth.enter_auth_steam_guard_code(code)
+    except AlreadyAuthorizedError as e:
+        logging.info(f'Steam - Авторизован как {e.login}')
+    except RuntimeError:
+        pass
+
     await steam.clear_cart()
 
     steam.start_friend_list_updater()
@@ -143,6 +146,7 @@ async def on_startup(app):
 
 async def on_cleanup(app):
     await app['steam'].__aexit__()
+    stop_display()
 
 
 def main():
