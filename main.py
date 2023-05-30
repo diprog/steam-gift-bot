@@ -63,7 +63,7 @@ async def handle_delivery(digiseller: Digiseller, steam: Steam, delivery: db.del
     await delivery.set_status(DeliveryStatus.GETTING_PURCHASE_INFO)
     purchase = await digiseller.get_purchase_by_code(delivery.digiseller_code)
     product = await digiseller.get_product(purchase['id_goods'])
-    steam_product_url = find_steam_product_url(product['info'], 'Подробнее о товаре: ')
+    steam_product_url = find_steam_product_url(product['info'])
     user_steam_profile = await get_user_by_url(delivery.steam_profile_url)
     if not steam_product_url:
         await delivery.seterror(5)

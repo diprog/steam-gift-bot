@@ -67,11 +67,23 @@ def get_current_moscow_date_string():
     return current_datetime.strftime('%Y-%m-%d %H:%M:%S')
 
 
-def find_steam_product_url(text: str, splitter: str):
-    print(text)
-    for part in text.split(splitter):
-        if '/' in part:
-            return part.split()[0]
+def find_steam_product_url(text: str) -> str:
+    """
+    Находит URL-адрес продукта Steam в переданном тексте.
+
+    :param text: текст, в котором нужно найти URL-адрес продукта Steam.
+    :type text: str
+
+    :return: URL-адрес продукта Steam или пустая строка, если не найдено.
+    :rtype: str
+    """
+    splitters = ['Подробнее о товаре: ', 'Product details: ']
+    for splitter in splitters:
+        if splitter in text:
+            for part in text.split(splitter):
+                if '/' in part:
+                    return part.split()[0]
+    return ''
 
 
 def format_duration(seconds):
