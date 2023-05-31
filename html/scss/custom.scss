@@ -20,7 +20,7 @@ $gray-500: lighten($gray-900, 65%);
 // etc
 
 .btn-primary {
-    @include button-variant($primary, darken($primary, 7.5%), darken($primary, 35%), lighten($primary,5%), lighten($primary, 10%), darken($primary,30%));
+    @include button-variant($primary, $primary, lighten($primary, 45%), lighten($primary, 5%), lighten($primary,5%), lighten($primary,100%));
 }
 
 .btn-outline-primary {
