@@ -128,6 +128,7 @@ async def polling(steam: Steam, digiseller: Digiseller):
 
 async def on_startup(app):
     start_display()
+    # Steam
     steam = await Steam(user_data_dir='.chrome', login='aoki_kz1', password='a0dEsTNYk_').__aenter__()
     try:
         auth: AuthContext
@@ -147,8 +148,12 @@ async def on_startup(app):
     steam.start_friend_list_updater()
     app['steam'] = steam
 
+    # Digiseller
     digiseller = Digiseller(constants.SELLER_ID, constants.DIGISELLER_API_KEY)
     app['digiseller'] = digiseller
+
+    # Сбрасываем статус у незавершенных доставок:
+    await db.deliveries.reset_statuses_if_not_delivered()
 
     asyncio.create_task(polling(steam, digiseller))
 

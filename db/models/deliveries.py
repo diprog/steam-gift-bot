@@ -1,5 +1,4 @@
 import time
-from enum import Enum
 from typing import Optional
 
 from db.storage import Storage
@@ -96,3 +95,11 @@ async def create(digiseller_code: str) -> Delivery:
 async def set_status(digiseller_code: str, status: int):
     deliveries = await get()
     deliveries[digiseller_code].status = status
+
+
+async def reset_statuses_if_not_delivered():
+    deliveries = await get()
+    for i in range(0, len(deliveries)):
+        if deliveries[i].status != DeliveryStatus.DELIVERED:
+            deliveries[i].status = DeliveryStatus.WAITING_UNTIL_DELIVERY
+    await storage.write(deliveries)
