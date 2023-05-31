@@ -294,7 +294,7 @@
                 time_until_delivery = result.time;
                 if (result.time) {
                     $('#time_until_delivery').html('Доставка начнется <span class="lead">через ' + result.time + '</span>');
-                } else if (delivery.status !== 4) {
+                } else if (delivery.status !== 5) {
                     main_view.fadeOut(100, () => {
                         openDeliveryStatusView();
                         for (let i = 0; i < delivery.status; i++) {
