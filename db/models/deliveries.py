@@ -99,7 +99,7 @@ async def set_status(digiseller_code: str, status: int):
 
 async def reset_statuses_if_not_delivered():
     deliveries = await get()
-    for i in range(0, len(deliveries)):
-        if deliveries[i].status != DeliveryStatus.DELIVERED:
-            deliveries[i].status = DeliveryStatus.WAITING_UNTIL_DELIVERY
+    for key in deliveries.keys():
+        if deliveries[key].status != DeliveryStatus.DELIVERED:
+            deliveries[key].status = DeliveryStatus.WAITING_UNTIL_DELIVERY
     await storage.write(deliveries)
