@@ -16,3 +16,11 @@ function api(path, data={}, on_success=null) {
     });
 }
 
+function setThemeMode() {
+  // Проверяем, является ли тема браузера тёмной
+  if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      document.documentElement.setAttribute('data-bs-theme', 'dark')
+    } else {
+      document.documentElement.setAttribute('data-bs-theme', theme)
+    }
+}

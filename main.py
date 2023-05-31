@@ -162,12 +162,13 @@ def main():
     app = web.Application()
     app.add_routes(api_routes)
     app.add_routes(routes)
+    path = Path(__file__).parent.resolve()
     app.add_routes([
-        web.static('/js', Path(__file__).parent.resolve() / 'html/js'),
-        web.static('/css', Path(__file__).parent.resolve() / 'html/css'),
-        web.static('/assets', Path(__file__).parent.resolve() / 'html/assets'),
-        web.static('/bootstrap/js', Path(__file__).parent.resolve() / 'html/bootstrap/js'),
-        web.static('/bootstrap/css', Path(__file__).parent.resolve() / 'html/bootstrap/css')
+        web.static('/js', path / 'html/js'),
+        web.static('/css', path / 'html/css'),
+        web.static('/scss', path / 'html/scss'),
+        web.static('/assets', path / 'html/assets'),
+        web.static('/bootstrap', path / 'html/bootstrap')
     ])
     app.on_startup.append(on_startup)
     app.on_cleanup.append(on_cleanup)

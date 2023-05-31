@@ -1,0 +1,33 @@
+// Required
+@import "../bootstrap/scss/functions";
+
+// Default variable overrides
+$primary: #E91D24;
+$border-radius: 1rem;
+$gray-900: #1B1A1E;
+$gray-800: lighten($gray-900, 10%);
+$gray-500: lighten($gray-900, 65%);
+// Required
+@import "../bootstrap/scss/variables";
+@import "../bootstrap/scss/variables-dark";
+@import "../bootstrap/scss/maps";
+@import "../bootstrap/scss/mixins";
+@import "../bootstrap/scss/root";
+
+// Optional Bootstrap components here
+@import "../bootstrap/scss/reboot";
+@import "../bootstrap/scss/type";
+// etc
+
+.btn-primary {
+    @include button-variant($primary, darken($primary, 7.5%), darken($primary, 35%), lighten($primary,5%), lighten($primary, 10%), darken($primary,30%));
+}
+
+.btn-outline-primary {
+    @include button-outline-variant($primary, #222222, lighten($primary,5%), $primary);
+}
+
+// Color mode variables in _root.scss
+@include color-mode(dark) {
+  // CSS variable overrides here...
+}
